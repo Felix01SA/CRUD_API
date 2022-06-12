@@ -1,0 +1,10 @@
+{
+  "execMap": {
+    "ts": "ts-node --transpileOnly"
+  },
+  "ignore": ["node_modules", "**/*.spec.ts"],
+  "events": {
+    "restart": ["clear && echo 'Servidor reiniciado...'"],
+    "start": ["echo 'Servidor iniciado...'"]
+  }
+}
