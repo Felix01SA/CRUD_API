@@ -1,6 +1,7 @@
-import { Request, Response, RouterOptions } from 'express'
+import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { v4 as uuid } from 'uuid'
+import bcrypt from 'bcryptjs'
 
 const database = new PrismaClient()
 
@@ -15,20 +16,22 @@ class UserController {
     try {
       const id = uuid()
 
+      const encryptedPassword = bcrypt.hashSync(password, 10)
+
       const newUser = await database.user.create({
         data: {
           name,
           login,
-          password,
+          password: encryptedPassword,
           id,
         },
       })
 
-      newUser.password = `` // remove a senha do retorno
-
-      return res.json({ user: newUser }) // retorna o usuário criado
+      return res.json({ user: omitPassword(newUser) }) // retorna o usuário criado
     } catch (e) {
-      return res.status(400).json({ error: e })
+      console.log(e)
+
+      return res.status(500).json({ error: e })
     }
   }
 
@@ -42,12 +45,10 @@ class UserController {
 
     if (!existUser) return res.status(400).json({ error: 'User not found' })
 
-    if (existUser.password !== password)
+    if (!(await bcrypt.compare(password, existUser.password)))
       return res.status(400).json({ error: 'Password invalid' })
 
-    existUser.password = `` // remove a senha do retorno
-
-    return res.json({ user: existUser }) // retorna o usuário existente
+    return res.json({ user: omitPassword(existUser) })
   }
 
   async update(req: Request, res: Response) {
@@ -58,11 +59,13 @@ class UserController {
 
     if (!existUser) return res.status(400).json({ error: 'User not found' })
 
+    const encryptedPassword = bcrypt.hashSync(password, 10)
+
     let data
 
     if (!name) {
       data = {
-        password,
+        password: encryptedPassword,
       }
     } else if (!password) {
       data = {
@@ -71,7 +74,7 @@ class UserController {
     } else {
       data = {
         name,
-        password,
+        password: encryptedPassword,
       }
     }
 
@@ -82,9 +85,7 @@ class UserController {
       },
     })
 
-    userUpdated.password = `` // remove a senha do retorno
-
-    return res.json({ user: userUpdated })
+    return res.json({ user: omitPassword(userUpdated) })
   }
 
   async delete(req: Request, res: Response) {
@@ -101,3 +102,11 @@ class UserController {
 }
 
 export default new UserController()
+
+/**
+ * * Oculta a senha do usuário na resposta
+ */
+function omitPassword(user: any) {
+  const { password, ...userWithoutPassword } = user
+  return userWithoutPassword
+}
